@@ -80,7 +80,7 @@ flask run
 - [x] Environment setup
 - [x] Project structure defined
 - [x] Screen inventory finalised
-- [ ] Database schema
+- [x] Database schema
 - [ ] Scaffold files and folders
 - [ ] Strava OAuth flow
 - [ ] Activity sync

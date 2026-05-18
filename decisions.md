@@ -1,7 +1,8 @@
 # Tri Tracker — design decisions
 
 ## Architecture
-- Single user app — no multi-tenancy
+- Single user app — no multi-tenancy.  
+- If we use decide to implement multi-tenancy in the future, we'll simply reuse problem set 9 login and user management as that's not a novel area
 - Flask + SQLite + raw SQL (no ORM)
 - Bootstrap 5, Chart.js, Leaflet.js — all via CDN
 
