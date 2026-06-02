@@ -1,6 +1,258 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Tri Tracker{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">Dashboard</h1>
-<p class="text-muted">Coming soon — stat strip, workout hours chart, and route map.</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Dashboard</h1>
+    <a href="{{ url_for('main.sync') }}" class="btn btn-outline-warning btn-sm">Sync with Strava</a>
+</div>
+
+{# ── Stat strip ─────────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">This week</div>
+                <div class="fs-3 fw-bold">{{ week_km }}</div>
+                <div class="text-muted small">km</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">This week</div>
+                <div class="fs-3 fw-bold">{{ week_hrs }}</div>
+                <div class="text-muted small">hours</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">This week</div>
+                <div class="fs-3 fw-bold">{{ week_sessions }}</div>
+                <div class="text-muted small">sessions</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Last activity</div>
+                {% if last_act %}
+                    <div class="fs-6 fw-bold">{{ last_act.sport }}</div>
+                    <div class="text-muted small">{{ last_act.km }} km &middot; {{ last_act.date_str }}</div>
+                {% else %}
+                    <div class="fs-3 fw-bold text-muted">—</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Last week vs avg</div>
+                {% if trend_pct is not none %}
+                    <div class="fs-3 fw-bold {{ 'text-success' if trend_pct >= 0 else 'text-danger' }}">
+                        {{ '+' if trend_pct > 0 else '' }}{{ trend_pct }}%
+                    </div>
+                    <div class="text-muted small">{{ last_week_hrs }}h &middot; avg {{ four_week_avg_hrs }}h</div>
+                {% else %}
+                    <div class="fs-3 fw-bold text-muted">—</div>
+                    <div class="text-muted small">not enough data</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ── Chart + Map ─────────────────────────────────────────────────────────── #}
+<div class="row g-3">
+
+    {# Hours chart #}
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Training Hours</span>
+                <div class="btn-group btn-group-sm" id="timescaleBtns" role="group">
+                    <button type="button" class="btn btn-outline-secondary active" data-scale="week">Week</button>
+                    <button type="button" class="btn btn-outline-secondary" data-scale="month">Month</button>
+                    <button type="button" class="btn btn-outline-secondary" data-scale="quarter">Quarter</button>
+                    <button type="button" class="btn btn-outline-secondary" data-scale="year">Year</button>
+                    <button type="button" class="btn btn-outline-secondary" data-scale="all">All</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="hoursChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    {# Route map #}
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Routes <span class="text-muted fw-normal small">(last 30 days)</span></span>
+                <div class="btn-group btn-group-sm" id="sportBtns" role="group">
+                    <button type="button" class="btn btn-outline-secondary" data-sport="Run">Run</button>
+                    <button type="button" class="btn btn-outline-secondary" data-sport="Ride">Ride</button>
+                    <button type="button" class="btn btn-outline-secondary" data-sport="Swim">Swim</button>
+                    <button type="button" class="btn btn-outline-secondary active" data-sport="All">All</button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="routeMap" style="height:420px; border-radius: 0 0 .375rem .375rem;"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Data from server ─────────────────────────────────────────────────────────
+const chartData    = {{ chart_data | tojson }};
+const mapActs      = {{ map_acts | tojson }};
+const sportColours = {{ sport_colours | tojson }};
+
+// ── Google Encoded Polyline decoder ──────────────────────────────────────────
+// Converts a Strava summary_polyline string to an array of [lat, lng] pairs.
+function decodePolyline(str) {
+    let i = 0, lat = 0, lng = 0, coords = [];
+    while (i < str.length) {
+        let b, shift = 0, result = 0;
+        do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; }
+        while (b >= 0x20);
+        lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+        shift = result = 0;
+        do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; }
+        while (b >= 0x20);
+        lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+        coords.push([lat / 1e5, lng / 1e5]);
+    }
+    return coords;
+}
+
+// ── Hours chart ──────────────────────────────────────────────────────────────
+const ctx = document.getElementById('hoursChart').getContext('2d');
+const d0  = chartData['week'];
+
+const hoursChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: d0.labels,
+        datasets: [
+            { label: 'Run',  data: d0.run,  backgroundColor: sportColours['Run'],  stack: 'hrs' },
+            { label: 'Ride', data: d0.ride, backgroundColor: sportColours['Ride'], stack: 'hrs' },
+            { label: 'Swim', data: d0.swim, backgroundColor: sportColours['Swim'], stack: 'hrs' },
+        ],
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+            x: { stacked: true },
+            y: { stacked: true, title: { display: true, text: 'Hours' } },
+        },
+    },
+});
+
+document.querySelectorAll('#timescaleBtns button').forEach(btn => {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#timescaleBtns button').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        const d = chartData[this.dataset.scale];
+        hoursChart.data.labels           = d.labels;
+        hoursChart.data.datasets[0].data = d.run;
+        hoursChart.data.datasets[1].data = d.ride;
+        hoursChart.data.datasets[2].data = d.swim;
+        hoursChart.update();
+    });
+});
+
+// ── Route map ────────────────────────────────────────────────────────────────
+const map = L.map('routeMap');
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+}).addTo(map);
+
+// Pre-decode all polylines once on page load
+const routes = mapActs
+    .filter(a => a.summary_polyline)
+    .map(a => ({
+        sport:    a.sport_group,
+        name:     a.name,
+        startLat: a.start_lat,
+        startLng: a.start_lng,
+        coords:   decodePolyline(a.summary_polyline),
+    }))
+    .filter(r => r.coords.length > 0);
+
+let activeLayers = [];
+
+function drawRoutes(sport) {
+    activeLayers.forEach(l => map.removeLayer(l));
+    activeLayers = [];
+
+    const visible = sport === 'All' ? routes : routes.filter(r => r.sport === sport);
+
+    // Opacity gradient: newest = 0.9, oldest = 0.45 — keeps all routes legible
+    visible.forEach((r, idx) => {
+        const opacity = 0.9 - (idx / Math.max(visible.length - 1, 1)) * 0.45;
+        const line = L.polyline(r.coords, {
+            color: sportColours[r.sport] || '#888',
+            weight: 3,
+            opacity: opacity,
+        }).bindTooltip(r.name, { sticky: true }).addTo(map);
+        activeLayers.push(line);
+
+        // Dot with white stroke ring so it stands out against the map background
+        if (r.startLat != null && r.startLng != null) {
+            const dot = L.circleMarker([r.startLat, r.startLng], {
+                radius: 5,
+                color: '#fff',
+                fillColor: sportColours[r.sport] || '#888',
+                fillOpacity: 0.9,
+                weight: 2,
+            }).bindTooltip(r.name, { sticky: true }).addTo(map);
+            activeLayers.push(dot);
+        }
+    });
+
+    // Fit to the 10 most recent activities so the map opens on the athlete's
+    // current training area rather than spanning UAE + France at hemisphere scale
+    const recentPoints = visible
+        .slice(0, 10)
+        .filter(r => r.startLat != null && r.startLng != null)
+        .map(r => [r.startLat, r.startLng]);
+
+    if (recentPoints.length > 0) {
+        map.fitBounds(recentPoints, { padding: [30, 30] });
+    } else {
+        map.setView([0, 0], 2);
+    }
+}
+
+drawRoutes('All');
+
+document.querySelectorAll('#sportBtns button').forEach(btn => {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#sportBtns button').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        drawRoutes(this.dataset.sport);
+    });
+});
+</script>
 {% endblock %}

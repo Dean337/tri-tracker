@@ -81,11 +81,11 @@ flask run
 - [x] Project structure defined
 - [x] Screen inventory finalised
 - [x] Database schema
-- [ ] Scaffold files and folders
-- [ ] Strava OAuth flow
-- [ ] Activity sync
-- [ ] Dashboard
-- [ ] Activities list + detail
+- [x] Scaffold files and folders
+- [x] Strava OAuth flow
+- [x] Activity sync
+- [x] Dashboard
+- [x] Activities list + detail
 - [ ] Trends
 - [ ] Race predictor
 - [ ] Deployment to Render

@@ -1,6 +1,88 @@
 {% extends "base.html" %}
 {% block title %}Activities — Tri Tracker{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">Activities</h1>
-<p class="text-muted">Coming soon — filterable, paginated activity list.</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">
+        Activities
+        <span class="text-muted fs-6 fw-normal ms-2">{{ total }}</span>
+    </h1>
+    <div class="btn-group btn-group-sm" role="group">
+        {% for s in ['All', 'Run', 'Ride', 'Swim'] %}
+        <a href="{{ url_for('activities.activities', sport=s) }}"
+           class="btn btn-outline-secondary{{ ' active' if sport == s else '' }}">{{ s }}</a>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>Date</th>
+                <th>Sport</th>
+                <th>Name</th>
+                <th class="text-end">Dist</th>
+                <th class="text-end">Time</th>
+                <th class="text-end">Pace / Speed</th>
+                <th class="text-end">Elev</th>
+                <th class="text-end">Avg HR</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in acts %}
+            <tr style="cursor:pointer"
+                onclick="location.href='{{ url_for('activities.activity_detail', activity_id=a.id) }}'">
+                <td class="text-muted small text-nowrap">{{ a.date_str }}</td>
+                <td>
+                    <span class="badge"
+                          style="background:{{ sport_colours.get(a.sport, '#888') }}">
+                        {{ a.sport }}{% if a.trainer %} &middot; indoor{% endif %}
+                    </span>
+                </td>
+                <td>{{ a.name }}</td>
+                <td class="text-end text-nowrap">{{ a.km }}&thinsp;km</td>
+                <td class="text-end text-nowrap">{{ a.duration }}</td>
+                <td class="text-end text-muted small text-nowrap">{{ a.pace }}</td>
+                <td class="text-end text-muted small">
+                    {% if a.elev is not none %}{{ a.elev }}&thinsp;m{% else %}—{% endif %}
+                </td>
+                <td class="text-end text-muted small">
+                    {{ a.hr if a.hr is not none else '—' }}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="text-center text-muted py-5">No activities found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center mb-0">
+        <li class="page-item {{ 'disabled' if page == 1 }}">
+            <a class="page-link"
+               href="{{ url_for('activities.activities', sport=sport, page=page-1) }}">&#8249;</a>
+        </li>
+        {% for p in page_items %}
+            {% if p is none %}
+            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% else %}
+            <li class="page-item {{ 'active' if p == page }}">
+                <a class="page-link"
+                   href="{{ url_for('activities.activities', sport=sport, page=p) }}">{{ p }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {{ 'disabled' if page == total_pages }}">
+            <a class="page-link"
+               href="{{ url_for('activities.activities', sport=sport, page=page+1) }}">&#8250;</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
 {% endblock %}

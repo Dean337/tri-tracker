@@ -1,6 +1,174 @@
 {% extends "base.html" %}
 {% block title %}Trends — Tri Tracker{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">Trends</h1>
-<p class="text-muted">Coming soon — pace, distance, and elevation charts per sport.</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Trends</h1>
+    <div class="d-flex gap-2">
+        <div class="btn-group btn-group-sm" id="sportBtns" role="group">
+            <button type="button" class="btn btn-outline-secondary active" data-sport="Run">Run</button>
+            <button type="button" class="btn btn-outline-secondary" data-sport="Ride">Ride</button>
+            <button type="button" class="btn btn-outline-secondary" data-sport="Swim">Swim</button>
+        </div>
+        <div class="btn-group btn-group-sm" id="scaleBtns" role="group">
+            <button type="button" class="btn btn-outline-secondary" data-scale="week">Week</button>
+            <button type="button" class="btn btn-outline-secondary active" data-scale="month">Month</button>
+            <button type="button" class="btn btn-outline-secondary" data-scale="quarter">Quarter</button>
+            <button type="button" class="btn btn-outline-secondary" data-scale="year">Year</button>
+            <button type="button" class="btn btn-outline-secondary" data-scale="all">All</button>
+        </div>
+    </div>
+</div>
+
+{# ── Distance + Pace ───────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">Distance <span id="distUnit" class="text-muted fw-normal small">(km)</span></div>
+            <div class="card-body"><canvas id="distChart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold" id="paceLabel">Avg Pace</div>
+            <div class="card-body"><canvas id="paceChart"></canvas></div>
+        </div>
+    </div>
+</div>
+
+{# ── Elevation (hidden for Swim) ────────────────────────────────────────────── #}
+<div class="row g-3" id="elevRow">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header fw-semibold">Elevation Gain <span class="text-muted fw-normal small">(m)</span></div>
+            <div class="card-body"><canvas id="elevChart"></canvas></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const trendsData   = {{ trends_data | tojson }};
+const sportColours = {{ sport_colours | tojson }};
+
+let currentSport = 'Run';
+let currentScale = 'month';
+
+// ── Pace formatting helpers ───────────────────────────────────────────────────
+function paceLabel(sport) {
+    if (sport === 'Run')  return 'Avg Pace (min / km)';
+    if (sport === 'Swim') return 'Avg Pace (min / 100m)';
+    return 'Avg Speed (km / h)';
+}
+
+// val is decimal minutes (Run/Swim) or km/h (Ride)
+function fmtPace(val, sport) {
+    if (val == null) return '';
+    if (sport === 'Ride') return val.toFixed(1) + ' km/h';
+    const m = Math.floor(val);
+    const s = Math.round((val - m) * 60);
+    return m + ':' + String(s).padStart(2, '0');
+}
+
+// ── Chart factory ─────────────────────────────────────────────────────────────
+function makeBar(id, yTitle) {
+    return new Chart(document.getElementById(id), {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: sportColours['Run'] }] },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { title: { display: true, text: yTitle } } },
+        },
+    });
+}
+
+const distChart = makeBar('distChart', 'km');
+const elevChart = makeBar('elevChart', 'm');
+
+const paceChart = new Chart(document.getElementById('paceChart'), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            data: [],
+            borderColor: sportColours['Run'],
+            backgroundColor: 'transparent',
+            pointRadius: 3,
+            tension: 0.3,
+            spanGaps: false,   // show gap in line for weeks with no activity
+        }],
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: (ctx) => fmtPace(ctx.raw, currentSport),
+                },
+            },
+        },
+        scales: {
+            y: {
+                reverse: true,   // lower pace = faster = top of chart
+                title: { display: true, text: 'min / km' },
+                ticks: { callback: (val) => fmtPace(val, currentSport) },
+            },
+        },
+    },
+});
+
+// ── Update all three charts for the given sport + timescale ───────────────────
+function updateCharts(sport, scale) {
+    const d = trendsData[sport][scale];
+    const colour = sportColours[sport];
+
+    distChart.data.labels              = d.labels;
+    distChart.data.datasets[0].data    = d.km;
+    distChart.data.datasets[0].backgroundColor = colour;
+    distChart.update();
+
+    paceChart.data.labels              = d.labels;
+    paceChart.data.datasets[0].data    = d.pace;
+    paceChart.data.datasets[0].borderColor = colour;
+    paceChart.options.scales.y.reverse = (sport !== 'Ride');
+    paceChart.options.scales.y.title.text = paceLabel(sport);
+    paceChart.update();
+
+    elevChart.data.labels              = d.labels;
+    elevChart.data.datasets[0].data    = d.elev;
+    elevChart.data.datasets[0].backgroundColor = colour;
+    elevChart.update();
+
+    // Pace card title + elevation row visibility
+    document.getElementById('paceLabel').textContent = paceLabel(sport);
+    document.getElementById('elevRow').style.display = (sport === 'Swim') ? 'none' : '';
+}
+
+// Initialise
+updateCharts(currentSport, currentScale);
+
+// ── Button listeners ──────────────────────────────────────────────────────────
+document.querySelectorAll('#sportBtns button').forEach(btn => {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#sportBtns button').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentSport = this.dataset.sport;
+        updateCharts(currentSport, currentScale);
+    });
+});
+
+document.querySelectorAll('#scaleBtns button').forEach(btn => {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#scaleBtns button').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentScale = this.dataset.scale;
+        updateCharts(currentSport, currentScale);
+    });
+});
+</script>
 {% endblock %}
