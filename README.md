@@ -1,5 +1,5 @@
 # Tri Tracker 
-#### Vide Demo: <url>
+#### Vide Demo: https://www.youtube.com/watch?v=7yixtKLcZFs
 #### Description:
 
 # by Dean Forrester - June 2026
