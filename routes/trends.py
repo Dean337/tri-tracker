@@ -1,9 +1,10 @@
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from flask import Blueprint, render_template
 from db import get_db
 from utils import login_required
-from sports import SPORT_COLOURS, SPORT_GROUP_TYPES
+from sports import SPORT_COLOURS, SPORT_GROUP_TYPES, pace_decimal
+from buckets import week_bucket, week_label, month_label, quarter_bucket, WINDOW_WEEKS, WINDOW_MONTHS, WINDOW_YEARS
 
 trends_bp = Blueprint("trends", __name__)
 
@@ -31,36 +32,15 @@ def _bucket_sport(activities, sport, bucket_fn, label_fn):
     pace = []
     for k in keys:
         b = data[k]
-        if b["speed_n"] > 0:
-            s = b["speed_sum"] / b["speed_n"]   # avg m/s for this bucket
-            if sport == "Run":
-                pace.append(round(1000 / s / 60, 4))  # decimal min/km
-            elif sport == "Swim":
-                pace.append(round(100  / s / 60, 4))  # decimal min/100m
-            else:
-                pace.append(round(s * 3.6, 2))         # km/h
-        else:
-            pace.append(None)
+        s = b["speed_sum"] / b["speed_n"] if b["speed_n"] > 0 else None
+        pace.append(pace_decimal(s, sport))
 
     return {"labels": labels, "km": km, "pace": pace, "elev": elev}
 
 
 def _build_trends_data(db):
     """Return {sport: {timescale: {labels, km, pace, elev}}} for all combinations."""
-    now = datetime.now(timezone.utc)
-
-    def week_bucket(dt):
-        return (dt - timedelta(days=dt.weekday())).strftime("%Y-%m-%d")
-
-    def week_label(b):
-        return datetime.strptime(b, "%Y-%m-%d").strftime("%d %b")
-
-    def month_label(b):
-        return datetime.strptime(b + "-01", "%Y-%m-%d").strftime("%b '%y")
-
-    def quarter_bucket(dt):
-        return f"{dt.year}-Q{(dt.month - 1) // 3 + 1}"
-
+    now    = datetime.now(timezone.utc)
     result = {}
     for sport, types in SPORT_GROUP_TYPES.items():
         ph   = ",".join("?" * len(types))
@@ -81,9 +61,9 @@ def _build_trends_data(db):
             for r in rows
         ]
 
-        week_acts  = [a for a in acts if a["dt"] >= now - timedelta(weeks=16)]
-        month_acts = [a for a in acts if a["dt"] >= now - timedelta(days=18 * 30)]
-        year_acts  = [a for a in acts if a["dt"].year >= now.year - 4]
+        week_acts  = [a for a in acts if a["dt"] >= now - WINDOW_WEEKS]
+        month_acts = [a for a in acts if a["dt"] >= now - WINDOW_MONTHS]
+        year_acts  = [a for a in acts if a["dt"].year >= now.year - WINDOW_YEARS]
 
         result[sport] = {
             "week":    _bucket_sport(week_acts,  sport, week_bucket,                   week_label),

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Setup Guide — Tri Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+
+<h1 class="mb-1">Setup Guide</h1>
+<p class="text-muted mb-4">How to connect Tri Tracker to your Strava account and import your training data.</p>
+
+{# ── Step 1 ────────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">1 &mdash; Connect your Strava account</h5>
+        <p class="card-text">From the <a href="{{ url_for('main.index') }}">home page</a>, click
+        <strong>Connect with Strava</strong>. You'll be taken to Strava's website where you'll be
+        asked to log in (if you're not already) and grant Tri Tracker read-only access to your
+        activity data.</p>
+        <p class="card-text mb-0">Tri Tracker requests two permission scopes:</p>
+        <ul class="mt-2 mb-0">
+            <li><strong>read</strong> &mdash; your basic profile (name, profile picture)</li>
+            <li><strong>activity:read_all</strong> &mdash; all your activities, including private ones</li>
+        </ul>
+    </div>
+</div>
+
+{# ── Step 2 ────────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">2 &mdash; Import your activities</h5>
+        <p class="card-text">After connecting, click <strong>Sync with Strava</strong> in the top
+        right of the Dashboard. The first sync downloads your entire Strava history — this can take
+        30&ndash;60 seconds if you have several years of data.</p>
+        <p class="card-text mb-0">Each subsequent sync only fetches activities recorded since the
+        last sync, so it completes in a second or two.</p>
+    </div>
+</div>
+
+{# ── Step 3 ────────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">3 &mdash; Keep your data current</h5>
+        <p class="card-text mb-0">Tri Tracker does not sync automatically. Click
+        <strong>Sync with Strava</strong> whenever you want to pull in recent activities —
+        once a week after your long ride is a good habit.</p>
+    </div>
+</div>
+
+{# ── What we store ─────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">What data is stored?</h5>
+        <p class="card-text">Everything is stored locally in a SQLite database on this server.
+        Nothing is sent to any third party beyond the initial Strava API call.</p>
+        <p class="card-text mb-0">Per activity we store:</p>
+        <ul class="mt-2 mb-0">
+            <li>Name, sport type, date and time</li>
+            <li>Distance, elapsed time, moving time</li>
+            <li>Average and max speed, elevation gain</li>
+            <li>Heart rate (average and max) if recorded by your device</li>
+            <li>Power (watts) if you have a power meter</li>
+            <li>Strava suffer score</li>
+            <li>GPS summary polyline (the encoded route — used to draw the map)</li>
+            <li>Start coordinates (latitude/longitude)</li>
+            <li>Indoor/commute flags</li>
+        </ul>
+    </div>
+</div>
+
+{# ── Troubleshooting ───────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Troubleshooting</h5>
+        <dl class="mb-0">
+            <dt>Sync button says &ldquo;Sync failed&rdquo;</dt>
+            <dd class="mb-3">Your Strava access token may have expired. Try logging out and
+            reconnecting — this gets a fresh token. Strava tokens expire every 6 hours but are
+            refreshed automatically; a failure here usually means the refresh also failed,
+            which reconnecting fixes.</dd>
+
+            <dt>Activities are missing from the list</dt>
+            <dd class="mb-3">The Activities page shows only triathlon disciplines (Run, Ride,
+            Swim) by default. Use the <strong>All</strong> filter to see every sport type.
+            If activities are still missing, run another sync.</dd>
+
+            <dt>The map shows no routes</dt>
+            <dd class="mb-0">The dashboard map only draws outdoor activities with GPS data —
+            indoor trainer sessions and Zwift rides are excluded. If you only train indoors,
+            the map will be empty.</dd>
+        </dl>
+    </div>
+</div>
+
+</div>
+</div>
+{% endblock %}

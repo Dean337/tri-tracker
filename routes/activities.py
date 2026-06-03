@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, abort
 from db import get_db
 from utils import login_required
-from sports import SPORT_GROUP, SPORT_COLOURS, SPORT_GROUP_TYPES
+from sports import SPORT_GROUP, SPORT_COLOURS, SPORT_GROUP_TYPES, fmt_pace
 
 activities_bp = Blueprint("activities", __name__)
 
@@ -15,17 +15,6 @@ def _fmt_duration(seconds):
     m, s = divmod(rem, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
-
-def _fmt_pace(speed_ms, sport_group):
-    if not speed_ms or speed_ms <= 0:
-        return "—"
-    if sport_group == "Run":
-        m, s = divmod(int(1000 / speed_ms), 60)
-        return f"{m}:{s:02d} /km"
-    if sport_group == "Swim":
-        m, s = divmod(int(100 / speed_ms), 60)
-        return f"{m}:{s:02d} /100m"
-    return f"{speed_ms * 3.6:.1f} km/h"
 
 
 def _page_items(page, total_pages):
@@ -83,7 +72,7 @@ def activities():
             ).strftime("%d %b %Y"),
             "km":       round(r["distance"] / 1000, 1),
             "duration": _fmt_duration(r["moving_time"]),
-            "pace":     _fmt_pace(r["average_speed"], sg),
+            "pace":     fmt_pace(r["average_speed"], sg),
             "elev":     round(r["total_elevation_gain"]) if r["total_elevation_gain"] else None,
             "hr":       round(r["average_heartrate"]) if r["average_heartrate"] else None,
             "trainer":  r["sport_type"] in ("VirtualRide", "VirtualRun"),
@@ -120,7 +109,7 @@ def activity_detail(activity_id):
     a["km"]       = round(a["distance"] / 1000, 2)
     a["duration"] = _fmt_duration(a["moving_time"])
     a["elapsed"]  = _fmt_duration(a["elapsed_time"])
-    a["pace"]     = _fmt_pace(a["average_speed"], sg)
+    a["pace"]     = fmt_pace(a["average_speed"], sg)
     a["elev"]     = round(a["total_elevation_gain"]) if a["total_elevation_gain"] else None
     a["hr_avg"]   = round(a["average_heartrate"]) if a["average_heartrate"] else None
     a["hr_max"]   = round(a["max_heartrate"]) if a["max_heartrate"] else None

@@ -1,6 +1,186 @@
 {% extends "base.html" %}
 {% block title %}Race Predictor — Tri Tracker{% endblock %}
+
 {% block content %}
-<h1 class="mb-4">Race Predictor</h1>
-<p class="text-muted">Coming soon — predicted finish times for 10k through Full Ironman.</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Race Predictor</h1>
+    <div class="btn-group btn-group-sm" id="raceBtns" role="group">
+        {% for key, r in races.items() %}
+        <button type="button"
+                class="btn btn-outline-secondary{{ ' active' if loop.first else '' }}"
+                data-race="{{ key }}">{{ r.name }}</button>
+        {% endfor %}
+    </div>
+</div>
+
+{# ── Prediction card + leg breakdown ──────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+
+    <div class="col-md-4">
+        <div class="card h-100 text-center">
+            <div class="card-body d-flex flex-column justify-content-center py-4">
+                <div class="text-muted small mb-1" id="raceLabel"></div>
+                <div class="display-4 fw-bold mb-2" id="totalTime">—</div>
+                <div id="confidenceBadge"></div>
+                <div id="noDataMsg" class="text-muted small d-none">
+                    Not enough data for this race format.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8" id="legsCard">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">Leg Breakdown</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0 align-middle">
+                    <tbody id="legsBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ── 12-week history chart ─────────────────────────────────────────────────── #}
+<div class="card">
+    <div class="card-header fw-semibold">
+        Predicted Finish — 12-week trend
+        <span class="text-muted fw-normal small">(lower = faster)</span>
+    </div>
+    <div class="card-body">
+        <canvas id="historyChart"></canvas>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const predData = {{ pred_data | tojson }};
+const races    = {{ races | tojson }};
+
+let currentRace = Object.keys(races)[0];
+
+// ── Time formatting ───────────────────────────────────────────────────────────
+function fmtSecs(s) {
+    if (s == null) return '—';
+    const h   = Math.floor(s / 3600);
+    const m   = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return h + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+}
+
+function fmtMins(s) {
+    const m   = Math.floor(s / 60);
+    const sec = s % 60;
+    return m + ':' + String(sec).padStart(2, '0');
+}
+
+// ── History chart ─────────────────────────────────────────────────────────────
+const historyChart = new Chart(document.getElementById('historyChart'), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            data: [],
+            borderColor: '#0d6efd',
+            backgroundColor: 'transparent',
+            pointRadius: 4,
+            tension: 0.3,
+            spanGaps: false,
+        }],
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => fmtSecs(ctx.raw) } },
+        },
+        scales: {
+            y: {
+                reverse: true,
+                title: { display: true, text: 'Predicted finish time' },
+                ticks: {
+                    callback: (val) => {
+                        const h = Math.floor(val / 3600);
+                        const m = Math.floor((val % 3600) / 60);
+                        return h + ':' + String(m).padStart(2, '0');
+                    },
+                },
+            },
+        },
+    },
+});
+
+// ── Render prediction card ────────────────────────────────────────────────────
+function renderPrediction(race) {
+    const cur  = predData[race].current;
+    const meta = races[race];
+
+    document.getElementById('raceLabel').textContent = meta.name;
+
+    if (!cur.has_data) {
+        document.getElementById('totalTime').textContent    = '—';
+        document.getElementById('confidenceBadge').innerHTML = '';
+        document.getElementById('noDataMsg').classList.remove('d-none');
+        document.getElementById('legsCard').style.display   = 'none';
+        return;
+    }
+
+    document.getElementById('noDataMsg').classList.add('d-none');
+    document.getElementById('totalTime').textContent = fmtSecs(cur.total_secs);
+
+    const conf = cur.confidence;
+    const cls  = conf >= 70 ? 'text-success' : conf >= 40 ? 'text-warning' : 'text-danger';
+    document.getElementById('confidenceBadge').innerHTML =
+        `<span class="fw-semibold ${cls}">${conf}% confidence</span>`;
+
+    if (meta.is_tri) {
+        document.getElementById('legsCard').style.display = '';
+        const legs = cur.legs;
+        const rows = [
+            ['Swim', fmtSecs(legs.swim), false],
+            ['T1',   fmtMins(legs.t1),   true],
+            ['Bike', fmtSecs(legs.bike), false],
+            ['T2',   fmtMins(legs.t2),   true],
+            ['Run',  fmtSecs(legs.run),  false],
+        ];
+        document.getElementById('legsBody').innerHTML = rows.map(([label, val, dim]) =>
+            `<tr${dim ? ' class="table-light"' : ''}>
+                <td class="ps-3 ${dim ? 'text-muted small' : 'fw-semibold'}">${label}</td>
+                <td class="pe-3 text-end ${dim ? 'text-muted small' : ''}">${val}</td>
+            </tr>`
+        ).join('');
+    } else {
+        document.getElementById('legsCard').style.display = 'none';
+    }
+}
+
+// ── Render history chart ──────────────────────────────────────────────────────
+function renderHistory(race) {
+    const hist = predData[race].history;
+    historyChart.data.labels           = hist.map(p => p.label);
+    historyChart.data.datasets[0].data = hist.map(p => p.secs);
+    historyChart.update();
+}
+
+function update(race) {
+    renderPrediction(race);
+    renderHistory(race);
+}
+
+update(currentRace);
+
+// ── Race selector ─────────────────────────────────────────────────────────────
+document.querySelectorAll('#raceBtns button').forEach(btn => {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('#raceBtns button').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentRace = this.dataset.race;
+        update(currentRace);
+    });
+});
+</script>
 {% endblock %}

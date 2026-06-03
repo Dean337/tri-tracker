@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Methodology — Tri Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+
+<h1 class="mb-1">Prediction Methodology</h1>
+<p class="text-muted mb-4">How Tri Tracker estimates your race finish times.</p>
+
+{# ── Overview ──────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Overview</h5>
+        <p class="card-text mb-0">The predictor uses your recent training data to estimate finish
+        times for six race formats: 10k, Half Marathon, Marathon, Olympic Triathlon, Half Ironman,
+        and Full Ironman. For each race it calculates a time per leg (swim, bike, run) separately,
+        then adds fixed transition times to produce a total.</p>
+    </div>
+</div>
+
+{# ── Training window ───────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Training window</h5>
+        <p class="card-text">The model looks at the <strong>90 days</strong> of activities
+        immediately before the prediction date. Only non-commute activities are included;
+        activities shorter than 1&thinsp;km are ignored.</p>
+        <p class="card-text mb-0">If no activities exist within the 90-day window for a required
+        discipline, the model falls back to the most recent activity ever recorded for that sport.
+        This ensures a prediction is always shown, though the confidence score will be lower.</p>
+    </div>
+</div>
+
+{# ── Weighted average pace ─────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Weighted average pace</h5>
+        <p class="card-text">Rather than a simple average, each activity is weighted by its
+        distance. A 20&thinsp;km run represents your sustainable pace more faithfully than a
+        3&thinsp;km jog, so it contributes proportionally more to the average.</p>
+        <div class="bg-light rounded p-3 font-monospace small mb-3">
+            weighted_speed = &Sigma;(speed &times; distance) &divide; &Sigma;(distance)
+        </div>
+        <p class="card-text mb-0">This produces one reference speed in metres per second for
+        each discipline, along with a weighted average training distance used in the next step.</p>
+    </div>
+</div>
+
+{# ── Riegel's formula ──────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Distance adjustment &mdash; Riegel&rsquo;s formula</h5>
+        <p class="card-text">Your training pace cannot be held forever. Riegel&rsquo;s endurance
+        formula (empirically derived from race results across all distances) captures the
+        relationship between distance and sustainable speed:</p>
+        <div class="bg-light rounded p-3 font-monospace small mb-3">
+            T<sub>race</sub> = T<sub>training</sub> &times; (D<sub>race</sub> / D<sub>training</sub>)<sup>1.06</sup>
+        </div>
+        <p class="card-text">Rewritten in terms of speed (since speed = distance &divide; time):</p>
+        <div class="bg-light rounded p-3 font-monospace small mb-3">
+            speed<sub>race</sub> = speed<sub>training</sub> &times; (D<sub>training</sub> / D<sub>race</sub>)<sup>0.06</sup>
+        </div>
+        <p class="card-text mb-0">The exponent 0.06 means that doubling the race distance
+        produces roughly a 4% speed penalty. This is well-validated for running up to marathon
+        distance and is used as a reasonable approximation for cycling and swimming as well.</p>
+    </div>
+</div>
+
+{# ── Open water penalty ────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Open water swim penalty</h5>
+        <p class="card-text mb-0">Strava swim data comes from pool sessions. Open water racing is
+        slower due to navigation, waves, and the absence of walls to push off. For triathlon swim
+        legs, the model applies a <strong>10% speed reduction</strong> to your pool pace before
+        the Riegel adjustment. This is applied before calculating the leg time.</p>
+    </div>
+</div>
+
+{# ── Race formats ──────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Race formats and transition times</h5>
+        <p class="card-text">Transition times (T1 = swim-to-bike, T2 = bike-to-run) are not
+        available in Strava data — Strava records each leg as a separate activity. The model uses
+        fixed estimates representing typical amateur times:</p>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Race</th>
+                        <th class="text-end">Swim</th>
+                        <th class="text-end">Bike</th>
+                        <th class="text-end">Run</th>
+                        <th class="text-end">T1</th>
+                        <th class="text-end">T2</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>10k</td>          <td class="text-end text-muted">—</td>    <td class="text-end text-muted">—</td>      <td class="text-end">10 km</td>   <td class="text-end text-muted">—</td>    <td class="text-end text-muted">—</td></tr>
+                    <tr><td>Half Marathon</td><td class="text-end text-muted">—</td>    <td class="text-end text-muted">—</td>      <td class="text-end">21.1 km</td> <td class="text-end text-muted">—</td>    <td class="text-end text-muted">—</td></tr>
+                    <tr><td>Marathon</td>     <td class="text-end text-muted">—</td>    <td class="text-end text-muted">—</td>      <td class="text-end">42.2 km</td> <td class="text-end text-muted">—</td>    <td class="text-end text-muted">—</td></tr>
+                    <tr><td>Olympic</td>      <td class="text-end">1.5 km</td>  <td class="text-end">40 km</td>    <td class="text-end">10 km</td>   <td class="text-end">4:00</td>  <td class="text-end">3:00</td></tr>
+                    <tr><td>Half Ironman</td> <td class="text-end">1.9 km</td>  <td class="text-end">90 km</td>    <td class="text-end">21.1 km</td> <td class="text-end">7:00</td>  <td class="text-end">5:00</td></tr>
+                    <tr><td>Ironman</td>      <td class="text-end">3.8 km</td>  <td class="text-end">180 km</td>   <td class="text-end">42.2 km</td> <td class="text-end">10:00</td> <td class="text-end">8:00</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{# ── Confidence score ──────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Confidence score</h5>
+        <p class="card-text">The confidence score (0&ndash;100%) reflects data quality.
+        It starts at 100% and deductions are applied per discipline:</p>
+        <ul class="mb-2">
+            <li><strong>&minus;20%</strong> if fewer than 3 activities in the 90-day window</li>
+            <li><strong>&minus;15%</strong> if the data is stale (no activities in the window at all)</li>
+            <li><strong>&minus;10%</strong> if average training distance is less than 40% of the race segment distance</li>
+        </ul>
+        <p class="card-text mb-0">The score has a minimum of 10%. The colour coding is
+        green &ge;70%, amber 40&ndash;69%, red below 40%.</p>
+    </div>
+</div>
+
+{# ── 12-week history ───────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">12-week history chart</h5>
+        <p class="card-text">The history chart shows how your predicted finish time for the
+        selected race has changed over the past 12 weeks. Each point on the chart is calculated
+        independently: the model is run with a cutoff date set to that Monday, using only
+        activities recorded before that date.</p>
+        <p class="card-text mb-0">A downward trend means your predicted time is improving
+        (getting faster). Gaps in the line indicate weeks where there was insufficient data
+        to make a prediction for a required discipline.</p>
+    </div>
+</div>
+
+{# ── Limitations ───────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Limitations</h5>
+        <ul class="mb-0">
+            <li>Riegel&rsquo;s formula becomes less accurate at very long distances (Ironman bike and run).
+                Predictions for full Ironman should be treated as rough guides only.</li>
+            <li>The model does not account for race-day conditions such as heat, wind, elevation,
+                or course profile.</li>
+            <li>It does not model fatigue accumulation across legs in a triathlon &mdash; each leg
+                is predicted in isolation as if it were a standalone effort.</li>
+            <li>Pool swim pace is the only swim data available from Strava. Athletes who train
+                primarily in open water will have less accurate swim predictions.</li>
+            <li>Transition times are fixed estimates and do not reflect your personal T1/T2 speed.</li>
+        </ul>
+    </div>
+</div>
+
+</div>
+</div>
+{% endblock %}

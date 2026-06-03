@@ -5,6 +5,7 @@ from db import get_db
 from utils import login_required
 from sync import sync_activities
 from sports import SPORT_GROUP, SPORT_COLOURS
+from buckets import week_bucket, week_label, month_label, quarter_bucket, WINDOW_WEEKS, WINDOW_MONTHS, WINDOW_YEARS
 import strava
 
 main_bp = Blueprint("main", __name__)
@@ -49,21 +50,9 @@ def _build_chart_data(db):
 
     now = datetime.now(timezone.utc)
 
-    def week_bucket(dt):
-        return (dt - timedelta(days=dt.weekday())).strftime("%Y-%m-%d")
-
-    def week_label(b):
-        return datetime.strptime(b, "%Y-%m-%d").strftime("%d %b")
-
-    def month_label(b):
-        return datetime.strptime(b + "-01", "%Y-%m-%d").strftime("%b '%y")
-
-    def quarter_bucket(dt):
-        return f"{dt.year}-Q{(dt.month - 1) // 3 + 1}"
-
-    week_acts  = [a for a in activities if a["dt"] >= now - timedelta(weeks=16)]
-    month_acts = [a for a in activities if a["dt"] >= now - timedelta(days=18 * 30)]
-    year_acts  = [a for a in activities if a["dt"].year >= now.year - 4]
+    week_acts  = [a for a in activities if a["dt"] >= now - WINDOW_WEEKS]
+    month_acts = [a for a in activities if a["dt"] >= now - WINDOW_MONTHS]
+    year_acts  = [a for a in activities if a["dt"].year >= now.year - WINDOW_YEARS]
 
     return {
         "week":    bucket_data(week_acts,  week_bucket,                   week_label),

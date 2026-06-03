@@ -55,6 +55,8 @@ flask run
 | Activity detail  | /activities/<id>   | Single activity stats + Leaflet route map |
 | Trends           | /trends            | Pace/distance/elevation charts per sport  |
 | Race predictor   | /predictor         | 6 race formats, prediction card + history |
+| Setup guide      | /guide             | Static. How to connect Strava + sync      |
+| Methodology      | /methodology       | Static. Explains prediction calculations  |
 | OAuth callback   | /callback          | No template — handles token exchange      |
 | Logout           | /logout            | No template — clears session              |
 
@@ -86,6 +88,8 @@ flask run
 - [x] Activity sync
 - [x] Dashboard
 - [x] Activities list + detail
-- [ ] Trends
-- [ ] Race predictor
+- [x] Trends
+- [x] Race predictor
+- [x] Setup guide (static)
+- [x] Methodology page (static)
 - [ ] Deployment to Render
