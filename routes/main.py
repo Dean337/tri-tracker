@@ -115,7 +115,7 @@ def dashboard():
     four_week_avg_hrs = (prev["time_s"] or 0) / 3600 / 4
 
     trend_pct = (
-        round((last_week_hrs - four_week_avg_hrs) / four_week_avg_hrs * 100)
+        round((last_week_hrs - four_week_avg_hrs) / four_week_avg_hrs * 100, 1)
         if four_week_avg_hrs > 0 else None
     )
 
