@@ -2,10 +2,24 @@
 {% block title %}Tri Tracker{% endblock %}
 {% block content %}
 <div class="row justify-content-center mt-5">
-    <div class="col-md-6 text-center">
-        <h1 class="mb-3">Tri Tracker</h1>
-        <p class="text-muted mb-4">Your personal triathlon training dashboard.</p>
-        <a href="{{ auth_url }}" class="btn btn-warning btn-lg">Connect with Strava</a>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h4 class="card-title mb-3">Tri Tracker</h4>
+                <table class="table table-borderless table-sm mb-0">
+                    <tbody>
+                        <tr><th scope="row">Name</th><td>Dean Forrester</td></tr>
+                        <tr><th scope="row">GitHub Username</th><td>Dean337</td></tr>
+                        <tr><th scope="row">edX Username</th><td>dean.forrester@gmail.com</td></tr>
+                        <tr><th scope="row">Location</th><td>Abu Dhabi, UAE</td></tr>
+                        <tr><th scope="row">Date</th><td>3rd June 2026</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="text-center">
+            <a href="{{ auth_url }}" class="btn btn-warning btn-lg">Connect with Strava</a>
+        </div>
     </div>
 </div>
 {% endblock %}

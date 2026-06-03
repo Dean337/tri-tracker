@@ -1,4 +1,8 @@
-# Tri Tracker
+# Tri Tracker 
+#### Vide Demo: <url>
+#### Description:
+
+# by Dean Forrester - June 2026
 
 A personal training analytics dashboard for a single triathlete. It pulls activity data from the Strava API, stores it locally in SQLite, and presents training trends, route maps, and race finish time predictions through a Flask web application.
 
