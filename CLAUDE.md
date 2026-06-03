@@ -92,4 +92,4 @@ flask run
 - [x] Race predictor
 - [x] Setup guide (static)
 - [x] Methodology page (static)
-- [ ] Deployment to Render
+- [x] Deployment to Render

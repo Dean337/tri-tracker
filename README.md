@@ -35,6 +35,23 @@ After connecting your Strava account via OAuth, a one-click sync imports your fu
 
 - `static/js/map-utils.js` — Shared Leaflet utilities loaded by both the dashboard and activity detail templates. `decodePolyline` converts Google-encoded polyline strings (as returned by Strava) into Leaflet-compatible coordinate arrays. `createTileLayer` returns a CartoDB Voyager tile layer, which provides English place-name labels without requiring an API key. Factored out to avoid duplicating the same two functions across multiple templates.
 
+## Deployment
+
+The app runs on [Render](https://render.com) (Starter plan, $7/month) with a 1 GB persistent disk to keep the SQLite database alive across deploys and restarts.
+
+**Infrastructure:**
+- **Web service:** gunicorn with a 120-second worker timeout (the initial full Strava history sync can take longer than gunicorn's 30-second default)
+- **Persistent disk:** mounted at `/data`, database stored at `/data/tri_tracker.db`
+- **Auto-deploy:** every push to `main` on GitHub triggers a redeploy
+
+**First-time setup on a new instance:**
+1. Set environment variables in the Render dashboard: `SECRET_KEY` (generate), `DATABASE` (`/data/tri_tracker.db`), `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REDIRECT_URI`
+2. Initialise the database via the Render shell: `flask --app app init-db`
+3. Update the Strava API settings: set Authorization Callback Domain to the Render hostname and `STRAVA_REDIRECT_URI` to `https://<your-app>.onrender.com/callback`
+4. Visit the app, connect Strava, and run a sync
+
+Subsequent syncs are incremental — only new activities since `last_sync_at` are fetched — so they complete well within the timeout.
+
 ## Key design decisions
 
 **SQLite with raw SQL, no ORM.** This is a single-user app whose entire dataset fits comfortably in one file. An ORM adds abstraction cost with no benefit here, and raw SQL makes every query explicit and easy to read.
